@@ -1,0 +1,96 @@
+import pandas as pd
+import numpy as np
+
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score
+from sklearn.preprocessing import StandardScaler
+
+# Load dataset
+df = pd.read_csv("employee_attrition_dataset.csv")
+
+# Convert target variable to numeric (if Yes/No)
+df['Attrition'] = df['Attrition'].map({'Yes': 1, 'No': 0})
+
+# One-hot encoding BEFORE defining X
+df = pd.get_dummies(df, drop_first=True)
+
+# Define features and target
+X = df.drop('Attrition', axis=1)
+y = df['Attrition']
+
+# Scale features (optional for Random Forest)
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+# Train-test split (important: stratify for imbalance)
+X_train, X_test, y_train, y_test = train_test_split(
+    X_scaled, y,
+
+    test_size=0.2,
+    random_state=42,
+    stratify=y
+)
+
+# Create model
+model = RandomForestClassifier(
+    n_estimators=200,
+    class_weight='balanced',
+    random_state=42
+)
+
+# Train model
+model.fit(X_train, y_train)
+
+# Predictions
+y_pred = model.predict(X_test)
+y_prob = model.predict_proba(X_test)[:, 1]
+
+# Evaluation
+print("\nClassification Report:")
+print(classification_report(y_test, y_pred))
+
+print("\nROC-AUC Score:")
+print(roc_auc_score(y_test, y_prob))
+
+
+# -----------------------------
+# USER INPUT PREDICTION SECTION
+# -----------------------------
+
+print("\nEnter employee details for prediction:")
+print("Please enter values within the shown range.\n")
+
+# Get min and max values from training data
+
+feature_min = X.min()
+feature_max = X.max()
+
+user_input = []
+
+for col in X.columns:
+    min_val = feature_min[col]
+    max_val = feature_max[col]
+    
+    value = float(input(f"Enter value for {col} "
+                        f"(Min: {min_val:.2f}, Max: {max_val:.2f}): "))
+    
+    user_input.append(value)
+
+# Convert to numpy array
+user_input = np.array(user_input).reshape(1, -1)
+
+# Apply scaling
+user_input_scaled = scaler.transform(user_input)
+
+# Prediction
+prediction = model.predict(user_input_scaled)[0]
+prediction_prob = model.predict_proba(user_input_scaled)[0][1]
+
+# Output result
+if prediction == 1:
+    print("\nPrediction: Employee is likely to LEAVE.")
+else:
+    print("\nPrediction: Employee is likely to STAY.")
+
+print(f"Probability of Attrition: {prediction_prob:.2f}")
